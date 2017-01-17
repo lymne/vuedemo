@@ -1,6 +1,6 @@
 # sell
 
-> A Vue.js learning project lym 
+> A Vue.js learning project lym 66
 
 ## Build Setup
 
