@@ -14,7 +14,7 @@
          <li v-for="item in goods" class="food-list food-list-hook">
            <h1 class="title">{{item.name}}</h1>
            <ul>
-             <li v-for="food in item.foods" class="food-item border-1px">
+             <li  @click="selectFood(food,$event)" v-for="food in item.foods" class="food-item border-1px">
               <div class="icon" >
                 <img width="57" height="57" :src="food.icon" >
               </div>
@@ -29,17 +29,126 @@
                   <span class="now">$ {{food.price}}</span>
                   <span class="old" v-show="food.oldPrice">$ {{food.oldPrice}}</span>
                 </div>
+                <div class="cartcontrol-wrapper">
+                  <cartcontrol :food="food"></cartcontrol>
+                </div>
               </div>
              </li>
            </ul>
          </li>
        </ul>
      </div>
-     <shopcart :delivery-price="seller.deliveryPrice" :min-price="seller.minPrice" ></shopcart>
+     <shopcart v-ref:shopcart :select-foods="selectFoods" :delivery-price="seller.deliveryPrice" :min-price="seller.minPrice"></shopcart>
+     <food :food="selectedFood" v-ref:food></food>
    </div>
 
 
 </template>
+<script type="text/ecmascript-6">
+  import BScroll from 'better-scroll';
+  import shopcart from 'components/shopcart/shopcart';
+  import cartcontrol from 'components/cartcontrol/cartcontrol';
+  import food from 'components/food/food';
+  const ERR_OK = 0;
+
+  export default{
+    props: {
+      seller: {
+        type: Object
+      }
+    },
+    data () {
+      return {
+        goods: [],
+        listHeight: [],
+        scrollY: 0,
+        selectedFood: {}
+      };
+    },
+    computed: {
+      currentIndex () {
+        for (let i = 0; i < this.listHeight.length; i++) {
+          let height1 = this.listHeight[i];
+          let height2 = this.listHeight[i + 1];
+          if (!height2 || (this.scrollY >= height1 && this.scrollY < height2)) {
+            return i;
+          }
+        }
+        return 0;
+      },
+      selectFoods () {
+        let foods = [];
+        this.goods.forEach((good) => {
+          good.foods.forEach((food) => {
+            if (food.count) {
+              foods.push(food);
+            }
+          });
+        });
+        return foods;
+      }
+    },
+    created () {
+      this.classMap = ['discount', 'decrease', 'special', 'invoice', 'guarantee'];
+      this.$http.get('/api/goods').then((response) => {
+        response = response.body;
+        if (response.errno === ERR_OK) {
+          this.goods = response.data;
+          this.$nextTick(() => {
+            this._initScroll();
+            this._calculateHeight();
+          });
+        }
+      });
+    },
+    methods: {
+      _initScroll () {
+        this.menuScroll = new BScroll(this.$els.menuWrapper, {});
+        this.foodsScroll = new BScroll(this.$els.foodsWrapper, {
+          probeType: 3,
+          click: true
+        });
+        this.foodsScroll.on('scroll', (pos) => {
+          this.scrollY = Math.abs(Math.round(pos.y));
+        });
+      },
+      _calculateHeight () {
+        let foodList = this.$els.foodsWrapper.getElementsByClassName('food-list-hook');
+        let height = 0;
+        this.listHeight.push(height);
+        for (let i = 0; i < foodList.length; i++) {
+          let item = foodList[i];
+          height += item.clientHeight;
+          this.listHeight.push(height);
+        }
+        console.log(this.listHeight);
+      },
+      selectFood (food, event) {
+        if (!event._constructed) {
+          return;
+        }
+        this.selectedFood = food;
+        this.$refs.food.show();
+      },
+      // 带下划线为私有方法
+      _drop (target) {
+        this.$nextTick(() => {
+          this.$refs.shopcart.drop(target);
+        });
+      }
+    },
+    components: {
+      shopcart,
+      cartcontrol,
+      food
+    },
+    events: {
+      'cart.add' (target) {
+        this._drop(target);
+      }
+    }
+  };
+</script>
 <style  lang="stylus" rel="stylesheet/stylus">
     @import "../../common/stylus/mixin"
     .goods
@@ -142,74 +251,10 @@
                 text-decoration line-through
                 font-size: 10px
                 color:rgb(147,153,159)
-</style>
-<script type="text/ecmascript-6">
-  import BScroll from 'better-scroll';
-  import shopcart from 'components/shopcart/shopcart';
-  const ERR_OK = 0;
+            .cartcontrol-wrapper
+              position: absolute
+              right: 0
+              bottom: 12px
 
-  export default{
-    props: {
-      seller: {
-        type: Object
-      }
-    },
-    data () {
-      return {
-        goods: [],
-        listHeight: [],
-        scrollY: 0
-      };
-    },
-    computed: {
-      currentIndex () {
-        for (let i = 0; i < this.listHeight.length; i++) {
-          let height1 = this.listHeight[i];
-          let height2 = this.listHeight[i + 1];
-          if (!height2 || (this.scrollY >= height1 && this.scrollY < height2)) {
-            return i;
-          }
-        }
-        return 0;
-      }
-    },
-    created () {
-      this.classMap = ['discount', 'decrease', 'special', 'invoice', 'guarantee'];
-      this.$http.get('/api/goods').then((response) => {
-        response = response.body;
-        if (response.errno === ERR_OK) {
-          this.goods = response.data;
-          this.$nextTick(() => {
-            this._initScroll();
-            this._calculateHeight();
-          });
-        }
-      });
-    },
-    methods: {
-      _initScroll () {
-        this.menuScroll = new BScroll(this.$els.menuWrapper, {});
-        this.foodsScroll = new BScroll(this.$els.foodsWrapper, {
-          probeType: 3
-        });
-        this.foodsScroll.on('scroll', (pos) => {
-          this.scrollY = Math.abs(Math.round(pos.y));
-        });
-      },
-      _calculateHeight () {
-        let foodList = this.$els.foodsWrapper.getElementsByClassName('food-list-hook');
-        let height = 0;
-        this.listHeight.push(height);
-        for (let i = 0; i < foodList.length; i++) {
-          let item = foodList[i];
-          height += item.clientHeight;
-          this.listHeight.push(height);
-        }
-        console.log(this.listHeight);
-      }
-    },
-    components: {
-      shopcart
-    }
-  };
-</script>
+</style>
+
